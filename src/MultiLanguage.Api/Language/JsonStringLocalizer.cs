@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Localization;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace MultiLanguage.Api.Language
 {
@@ -10,7 +10,6 @@ namespace MultiLanguage.Api.Language
         #region Local Objects/Variables
 
         private readonly IDistributedCache _cache;
-        private readonly JsonSerializer _serializer = new();
 
         #endregion
 
@@ -25,25 +24,23 @@ namespace MultiLanguage.Api.Language
 
         #region Local Methods
 
-        private string? GetValueFromJSON(string propertyName, string filePath)
+        private static string? GetValueFromJSON(string propertyName, string filePath)
         {
             if (propertyName == null)
-            {
                 return default;
-            }
+            
             if (filePath == null)
-            {
                 return default;
-            }
-            using var str = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var sReader = new StreamReader(str);
-            using var reader = new JsonTextReader(sReader);
+
+            byte[] data = File.ReadAllBytes(filePath);
+            var reader = new Utf8JsonReader(data);
+
             while (reader.Read())
             {
-                if (reader.TokenType == JsonToken.PropertyName && reader.Value as string == propertyName)
+                if (reader.TokenType == JsonTokenType.PropertyName && reader.GetString() == propertyName)
                 {
                     reader.Read();
-                    return _serializer.Deserialize<string>(reader);
+                    return reader.GetString();
                 }
             }
             return default;
@@ -103,21 +100,26 @@ namespace MultiLanguage.Api.Language
         public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures)
         {
 
+            IList<LocalizedString> result = new List<LocalizedString>();
+
             var filePath = $"Resources/{Thread.CurrentThread.CurrentCulture.Name}.json";
-            using var str = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var sReader = new StreamReader(str);
-            using var reader = new JsonTextReader(sReader);
+
+            byte[] data = File.ReadAllBytes(filePath);
+            Utf8JsonReader reader = new(data);
+
             while (reader.Read())
             {
-                if (reader.TokenType != JsonToken.PropertyName)
+                if (reader.TokenType != JsonTokenType.PropertyName)
                     continue;
-                string? key = reader.Value as string;
+                string key = reader.GetString() ?? string.Empty;
                 reader.Read();
-                var value = _serializer.Deserialize<string>(reader);
-                yield return new LocalizedString(key, value, false);
+                string value = reader.GetString() ?? string.Empty;
+                result.Add(new LocalizedString(key, value, false));
             }
 
-            throw new NotImplementedException();
+            return result;
+
+
         }
 
         #endregion

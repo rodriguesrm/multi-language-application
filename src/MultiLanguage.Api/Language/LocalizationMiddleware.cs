@@ -18,7 +18,6 @@ namespace MultiLanguage.Api.Language
                 Thread.CurrentThread.CurrentCulture = culture;
                 Thread.CurrentThread.CurrentUICulture = culture;
             }
-
             await next(context);
 
         }
